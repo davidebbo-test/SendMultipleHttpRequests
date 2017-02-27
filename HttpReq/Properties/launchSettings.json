@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "HttpReq": {
+      "commandName": "Project",
+      "commandLineArgs": "https://functiondevch1.azurewebsites.net/api/HttpJSBusyWait 3 5000"
+    }
+  }
+}
