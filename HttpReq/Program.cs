@@ -22,7 +22,7 @@ namespace HttpReq
                 for (int i = 0; i < iterations; i++)
                 {
                     Console.WriteLine($"Starting request {i}");
-                    tasks.Add(client.GetStringAsync(url).ContinueWith(RequestDone, new InvocationState { Start = DateTime.Now, Iteration = i }));
+                    tasks.Add(client.GetAsync(url).ContinueWith(RequestDone, new InvocationState { Start = DateTime.Now, Iteration = i }));
                     await Task.Delay(delay);
                 }
 
@@ -30,10 +30,13 @@ namespace HttpReq
             }
         }
 
-        static void RequestDone(Task<string> action, object state)
+        static void RequestDone(Task<HttpResponseMessage> action, object state)
         {
             var invocationState = (InvocationState)state;
-            Console.WriteLine($"{invocationState.Iteration}: {DateTime.Now - invocationState.Start}: {action.Result}");
+
+            string requestContents = action.Result.Content.ReadAsStringAsync().Result;
+
+            Console.WriteLine($"{invocationState.Iteration}: {DateTime.Now - invocationState.Start}: {requestContents} {action.Result.StatusCode}");
         }
 
         class InvocationState
