@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace HttpReq
@@ -9,20 +10,30 @@ namespace HttpReq
     {
         static void Main(string[] args)
         {
-            DoWorkAsync(args[0], Int32.Parse(args[1]), Int32.Parse(args[2])).Wait();
+            string url = args[0];
+            int maxIterations = Int32.Parse(args[1]);
+            int countPerIteration = Int32.Parse(args[2]);
+            int delay = Int32.Parse(args[3]);
+
+            DoWorkAsync(url, maxIterations, countPerIteration, delay).Wait();
         }
 
-        static async Task DoWorkAsync(string url, int iterations, int delay)
+        static async Task DoWorkAsync(string url, int maxIterations, int countPerIteration, int delay)
         {
             var tasks = new List<Task>();
 
             using (var client = new HttpClient())
             {
+                client.Timeout = Timeout.InfiniteTimeSpan;
 
-                for (int i = 0; i < iterations; i++)
+                for (int currentIteration = 0; currentIteration < maxIterations; currentIteration++)
                 {
-                    Console.WriteLine($"Starting request {i}");
-                    tasks.Add(client.GetAsync(url).ContinueWith(RequestDone, new InvocationState { Start = DateTime.Now, Iteration = i }));
+                    for (int index = 0; index < countPerIteration; index++)
+                    {
+                        Console.WriteLine($"Starting request {index} of iteration {currentIteration}");
+                        tasks.Add(client.GetAsync(url).ContinueWith(RequestDone, new InvocationState { Start = DateTime.Now, Iteration = currentIteration, Index = index }));
+                    }
+
                     await Task.Delay(delay);
                 }
 
@@ -36,13 +47,14 @@ namespace HttpReq
 
             string requestContents = action.Result.Content.ReadAsStringAsync().Result;
 
-            Console.WriteLine($"{invocationState.Iteration}: {DateTime.Now - invocationState.Start}: {requestContents} {action.Result.StatusCode}");
+            Console.WriteLine($"{invocationState.Iteration}.{invocationState.Index}: {DateTime.Now - invocationState.Start}: {requestContents} {action.Result.StatusCode}");
         }
 
         class InvocationState
         {
             public DateTime Start { get; set; }
             public int Iteration { get; set; }
+            public int Index { get; set; }
         }
     }
 }
