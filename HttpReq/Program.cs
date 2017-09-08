@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -28,9 +29,11 @@ namespace HttpReq
 
                 for (int currentIteration = 0; currentIteration < maxIterations; currentIteration++)
                 {
+                    Console.WriteLine($"Iteration {currentIteration + 1}: generating {countPerIteration} requests");
+
                     for (int index = 0; index < countPerIteration; index++)
                     {
-                        Console.WriteLine($"Starting request {index} of iteration {currentIteration}");
+                        //Console.WriteLine($"Starting request {index} of iteration {currentIteration}");
                         tasks.Add(client.GetAsync(url).ContinueWith(RequestDone, new InvocationState { Start = DateTime.Now, Iteration = currentIteration, Index = index }));
                     }
 
@@ -47,7 +50,10 @@ namespace HttpReq
 
             string requestContents = action.Result.Content.ReadAsStringAsync().Result;
 
-            Console.WriteLine($"{invocationState.Iteration}.{invocationState.Index}: {DateTime.Now - invocationState.Start}: {requestContents} {action.Result.StatusCode}");
+            if (action.Result.StatusCode == HttpStatusCode.OK) return;
+
+            TimeSpan elapsed = DateTime.Now - invocationState.Start;
+            Console.WriteLine($"{invocationState.Iteration}.{invocationState.Index}: {(int)elapsed.TotalMilliseconds}ms: {requestContents} {action.Result.StatusCode}");
         }
 
         class InvocationState
