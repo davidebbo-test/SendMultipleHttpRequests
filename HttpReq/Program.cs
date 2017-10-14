@@ -23,7 +23,7 @@ namespace HttpReq
             int countPerIteration = Int32.Parse(args[2]);
             int delay = Int32.Parse(args[3]);
 
-            DoWorkAsync(url, maxIterations, countPerIteration, delay).Wait();
+            SendRequestsAsync(url, maxIterations, countPerIteration, delay).Wait();
 
             Console.WriteLine();
             Console.WriteLine("Request count by status code");
@@ -49,7 +49,7 @@ namespace HttpReq
             }
         }
 
-        static async Task DoWorkAsync(string url, int maxIterations, int countPerIteration, int delay)
+        static async Task SendRequestsAsync(string url, int maxIterations, int countPerIteration, int delay)
         {
             var tasks = new List<Task>();
 
@@ -63,7 +63,7 @@ namespace HttpReq
 
             for (int currentIteration = 0; currentIteration < maxIterations; currentIteration++)
             {
-                Console.WriteLine($"Iteration {currentIteration + 1}: generating {countPerIteration} requests");
+                //Console.WriteLine($"Iteration {currentIteration + 1}: generating {countPerIteration} requests");
 
                 for (int index = 0; index < countPerIteration; index++)
                 {
