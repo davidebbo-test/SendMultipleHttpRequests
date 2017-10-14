@@ -83,17 +83,31 @@ namespace HttpReq
         {
             var invocationState = (InvocationState)state;
             TimeSpan elapsed = DateTime.Now - invocationState.Start;
-            int statusCode = (int)action.Result.StatusCode;
 
-            var response = action.Result;
+            HttpResponseMessage response = null;
+            int statusCode;
+
+            try
+            {
+                response = action.Result;
+                statusCode = (int)response.StatusCode;
+            }
+            catch (Exception)
+            {
+                // Probably a timeout
+                statusCode = 0;
+            }
 
             lock (_lock)
             {
-                if (response.Headers.TryGetValues("X-server", out IEnumerable<string> values))
+                if (response != null)
                 {
-                    string serverName = values.First();
-                    _servers.TryGetValue(serverName, out int count);
-                    _servers[serverName] = count + 1;
+                    if (response.Headers.TryGetValues("X-server", out IEnumerable<string> values))
+                    {
+                        string serverName = values.First();
+                        _servers.TryGetValue(serverName, out int count);
+                        _servers[serverName] = count + 1;
+                    }
                 }
 
                 _totalTime += elapsed;
@@ -101,6 +115,12 @@ namespace HttpReq
 
                 _statusCodes.TryGetValue(statusCode, out int statusCount);
                 _statusCodes[statusCode] = statusCount + 1;
+            }
+
+            if (statusCode == 0)
+            {
+                Console.WriteLine("The request timed out");
+                return;
             }
 
             string requestContents = response.Content.ReadAsStringAsync().Result;
