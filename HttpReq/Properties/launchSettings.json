@@ -2,7 +2,7 @@
   "profiles": {
     "HttpReq": {
       "commandName": "Project",
-      "commandLineArgs": "https://functiondevch1.azurewebsites.net/api/HttpJSBusyWait 3 5000"
+      "commandLineArgs": "http://localhost:7071/api/HttpTest?SleepInMS=5000&AllocInMB=0 10 10 100"
     }
   }
 }

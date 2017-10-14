@@ -10,7 +10,11 @@ namespace HttpReq
 {
     class Program
     {
+        static object _lock = new object();
         static Dictionary<string, int> _servers = new Dictionary<string, int>();
+        static Dictionary<int, int> _statusCodes = new Dictionary<int, int>();
+        static TimeSpan _totalTime = new TimeSpan();
+        static int _totalRequests = 0;
 
         static void Main(string[] args)
         {
@@ -21,9 +25,27 @@ namespace HttpReq
 
             DoWorkAsync(url, maxIterations, countPerIteration, delay).Wait();
 
+            Console.WriteLine();
+            Console.WriteLine("Request count by status code");
+            foreach (var pair in _statusCodes)
+            {
+                Console.WriteLine($"  {pair.Key}: {pair.Value}");
+            }
+
+            Console.WriteLine($"Test input:");
+            Console.WriteLine($"  URL: {url}");
+            Console.WriteLine($"  Iterations: {maxIterations}");
+            Console.WriteLine($"  Requests per iteration: {countPerIteration}");
+            Console.WriteLine($"  Delay between iterations: {delay}");
+
+            Console.WriteLine();
+            Console.WriteLine($"Average request time: {(int)(_totalTime / _totalRequests).TotalMilliseconds}ms");
+
+            Console.WriteLine();
+            Console.WriteLine("Request count by server");
             foreach (var pair in _servers)
             {
-                Console.WriteLine($"{pair.Key}: {pair.Value}");
+                Console.WriteLine($"  {pair.Key}: {pair.Value}");
             }
         }
 
@@ -60,25 +82,32 @@ namespace HttpReq
         static void RequestDone(Task<HttpResponseMessage> action, object state)
         {
             var invocationState = (InvocationState)state;
+            TimeSpan elapsed = DateTime.Now - invocationState.Start;
+            int statusCode = (int)action.Result.StatusCode;
 
             var response = action.Result;
-            if (response.Headers.TryGetValues("X-server", out IEnumerable<string> values))
+
+            lock (_lock)
             {
-                string serverName = values.First();
-                int count;
-                lock (_servers)
+                if (response.Headers.TryGetValues("X-server", out IEnumerable<string> values))
                 {
-                    _servers.TryGetValue(serverName, out count);
+                    string serverName = values.First();
+                    _servers.TryGetValue(serverName, out int count);
                     _servers[serverName] = count + 1;
                 }
+
+                _totalTime += elapsed;
+                _totalRequests++;
+
+                _statusCodes.TryGetValue(statusCode, out int statusCount);
+                _statusCodes[statusCode] = statusCount + 1;
             }
 
             string requestContents = response.Content.ReadAsStringAsync().Result;
 
             if (action.Result.StatusCode == HttpStatusCode.OK) return;
 
-            TimeSpan elapsed = DateTime.Now - invocationState.Start;
-            Console.WriteLine($"{invocationState.Iteration}.{invocationState.Index}: {(int)elapsed.TotalMilliseconds}ms: {requestContents} {(int)action.Result.StatusCode} {action.Result.ReasonPhrase}");
+            Console.WriteLine($"{invocationState.Iteration}.{invocationState.Index}: {(int)elapsed.TotalMilliseconds}ms: {requestContents} {statusCode} {action.Result.ReasonPhrase}");
         }
 
         class InvocationState
