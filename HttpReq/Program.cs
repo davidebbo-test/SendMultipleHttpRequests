@@ -18,7 +18,7 @@ namespace HttpReq
 
         static void Main(string[] args)
         {
-            DateTime start = DateTime.Now;
+            DateTimeOffset start = DateTimeOffset.UtcNow;
             string url = args[0];
             int maxIterations = Int32.Parse(args[1]);
             int countPerIteration = Int32.Parse(args[2]);
@@ -28,13 +28,14 @@ namespace HttpReq
 
             Console.WriteLine();
             Console.WriteLine($"Test input:");
+            Console.WriteLine($"  UTC time: {start.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fff'Z'")}");
             Console.WriteLine($"  URL: {url}");
             Console.WriteLine($"  Iterations: {maxIterations}");
             Console.WriteLine($"  Requests per iteration: {countPerIteration}");
             Console.WriteLine($"  Delay between iterations: {delay}");
 
             Console.WriteLine();
-            Console.WriteLine($"Total test time: {(int)(DateTime.Now - start).TotalMilliseconds}ms");
+            Console.WriteLine($"Total test time: {(int)(DateTimeOffset.UtcNow - start).TotalMilliseconds}ms");
             Console.WriteLine($"Average request time: {(int)(_totalTime / _totalRequests).TotalMilliseconds}ms");
 
             Console.WriteLine();
@@ -61,7 +62,7 @@ namespace HttpReq
             for (int i = 0; i < clients.Length; i++)
             {
                 clients[i] = new HttpClient();
-                clients[i].Timeout = TimeSpan.FromSeconds(30);
+                clients[i].Timeout = TimeSpan.FromSeconds(60);
             }
 
             for (int currentIteration = 0; currentIteration < maxIterations; currentIteration++)
@@ -73,7 +74,7 @@ namespace HttpReq
                     HttpClient client = clients[(new Random()).Next() % clients.Length];
 
                     //Console.WriteLine($"Starting request {index} of iteration {currentIteration}");
-                    tasks.Add(client.GetAsync(url).ContinueWith(RequestDone, new InvocationState { Start = DateTime.Now, Iteration = currentIteration, Index = index }));
+                    tasks.Add(client.GetAsync(url).ContinueWith(RequestDone, new InvocationState { Start = DateTimeOffset.UtcNow, Iteration = currentIteration, Index = index }));
                 }
 
                 await Task.Delay(delay);
@@ -85,7 +86,7 @@ namespace HttpReq
         static void RequestDone(Task<HttpResponseMessage> action, object state)
         {
             var invocationState = (InvocationState)state;
-            TimeSpan elapsed = DateTime.Now - invocationState.Start;
+            TimeSpan elapsed = DateTimeOffset.UtcNow - invocationState.Start;
 
             HttpResponseMessage response = null;
             int statusCode;
@@ -135,7 +136,7 @@ namespace HttpReq
 
         class InvocationState
         {
-            public DateTime Start { get; set; }
+            public DateTimeOffset Start { get; set; }
             public int Iteration { get; set; }
             public int Index { get; set; }
         }
