@@ -18,6 +18,7 @@ namespace HttpReq
 
         static void Main(string[] args)
         {
+            DateTime start = DateTime.Now;
             string url = args[0];
             int maxIterations = Int32.Parse(args[1]);
             int countPerIteration = Int32.Parse(args[2]);
@@ -26,12 +27,6 @@ namespace HttpReq
             SendRequestsAsync(url, maxIterations, countPerIteration, delay).Wait();
 
             Console.WriteLine();
-            Console.WriteLine("Request count by status code");
-            foreach (var pair in _statusCodes)
-            {
-                Console.WriteLine($"  {pair.Key}: {pair.Value}");
-            }
-
             Console.WriteLine($"Test input:");
             Console.WriteLine($"  URL: {url}");
             Console.WriteLine($"  Iterations: {maxIterations}");
@@ -39,7 +34,15 @@ namespace HttpReq
             Console.WriteLine($"  Delay between iterations: {delay}");
 
             Console.WriteLine();
+            Console.WriteLine($"Total test time: {(int)(DateTime.Now - start).TotalMilliseconds}ms");
             Console.WriteLine($"Average request time: {(int)(_totalTime / _totalRequests).TotalMilliseconds}ms");
+
+            Console.WriteLine();
+            Console.WriteLine("Request count by status code");
+            foreach (var pair in _statusCodes)
+            {
+                Console.WriteLine($"  {pair.Key}: {pair.Value}");
+            }
 
             Console.WriteLine();
             Console.WriteLine("Request count by server");
@@ -58,7 +61,7 @@ namespace HttpReq
             for (int i = 0; i < clients.Length; i++)
             {
                 clients[i] = new HttpClient();
-                clients[i].Timeout = Timeout.InfiniteTimeSpan;
+                clients[i].Timeout = TimeSpan.FromSeconds(30);
             }
 
             for (int currentIteration = 0; currentIteration < maxIterations; currentIteration++)
