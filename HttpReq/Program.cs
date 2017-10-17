@@ -18,6 +18,12 @@ namespace HttpReq
 
         static void Main(string[] args)
         {
+            if (args.Length != 4)
+            {
+                Console.WriteLine("Usage: dotnet HttpReq.dll {url} {iterations} {reqPerIteration} {SleepBetweenIterationsInMS}");
+                return;
+            }
+
             DateTimeOffset start = DateTimeOffset.UtcNow;
             string url = args[0];
             int maxIterations = Int32.Parse(args[1]);
