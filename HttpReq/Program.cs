@@ -13,6 +13,7 @@ namespace HttpReq
         static object _lock = new object();
         static Dictionary<string, int> _servers = new Dictionary<string, int>();
         static Dictionary<int, int> _statusCodes = new Dictionary<int, int>();
+        static List<double> _latencies = new List<double>();
         static TimeSpan _totalTime = new TimeSpan();
         static int _totalRequests = 0;
 
@@ -42,7 +43,11 @@ namespace HttpReq
 
             Console.WriteLine();
             Console.WriteLine($"Total test time: {(int)(DateTimeOffset.UtcNow - start).TotalMilliseconds}ms");
-            Console.WriteLine($"Average request time: {(int)(_totalTime / _totalRequests).TotalMilliseconds}ms");
+            Console.WriteLine($"Min latency: {(int)_latencies.Min()}ms");
+            Console.WriteLine($"Avg. latency: {(int)_latencies.Average()}ms");
+            Console.WriteLine($"Max latency: {(int)_latencies.Max()}ms");
+            Console.WriteLine($"95th latency percentile: {(int)Percentile(_latencies.ToArray(), 0.95)}ms");
+            Console.WriteLine($"99th latency percentile: {(int)Percentile(_latencies.ToArray(), 0.99)}ms");
 
             Console.WriteLine();
             Console.WriteLine("Request count by status code");
@@ -71,15 +76,12 @@ namespace HttpReq
                 clients[i].Timeout = TimeSpan.FromSeconds(60);
             }
 
+            List<double> latencies = new List<double>();
             for (int currentIteration = 0; currentIteration < maxIterations; currentIteration++)
             {
-                //Console.WriteLine($"Iteration {currentIteration + 1}: generating {countPerIteration} requests");
-
                 for (int index = 0; index < countPerIteration; index++)
                 {
                     HttpClient client = clients[(new Random()).Next() % clients.Length];
-
-                    //Console.WriteLine($"Starting request {index} of iteration {currentIteration}");
                     tasks.Add(client.GetAsync(url).ContinueWith(RequestDone, new InvocationState { Start = DateTimeOffset.UtcNow, Iteration = currentIteration, Index = index }));
                 }
 
@@ -125,6 +127,7 @@ namespace HttpReq
 
                 _statusCodes.TryGetValue(statusCode, out int statusCount);
                 _statusCodes[statusCode] = statusCount + 1;
+                _latencies.Add(elapsed.TotalMilliseconds);
             }
 
             if (statusCode == 0)
@@ -133,11 +136,35 @@ namespace HttpReq
                 return;
             }
 
+            if (action.Result.StatusCode == HttpStatusCode.OK)
+            {
+                return;
+            }
+
             string requestContents = response.Content.ReadAsStringAsync().Result;
-
-            if (action.Result.StatusCode == HttpStatusCode.OK) return;
-
             Console.WriteLine($"{invocationState.Iteration}.{invocationState.Index}: {(int)elapsed.TotalMilliseconds}ms: {requestContents} {statusCode} {action.Result.ReasonPhrase}");
+        }
+
+        static double Percentile(double[] sequence, double excelPercentile)
+        {
+            Array.Sort(sequence);
+            int N = sequence.Length;
+            double n = (N - 1) * excelPercentile + 1;
+
+            if (n == 1d)
+            {
+                return sequence[0];
+            }
+            else if (n == N)
+            {
+                return sequence[N - 1];
+            }
+            else
+            {
+                int k = (int)n;
+                double d = n - k;
+                return sequence[k - 1] + d * (sequence[k] - sequence[k - 1]);
+            }
         }
 
         class InvocationState
