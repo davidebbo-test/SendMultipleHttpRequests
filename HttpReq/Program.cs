@@ -72,8 +72,10 @@ namespace HttpReq
             var clients = new HttpClient[50];
             for (int i = 0; i < clients.Length; i++)
             {
-                clients[i] = new HttpClient();
-                clients[i].Timeout = TimeSpan.FromSeconds(60);
+                clients[i] = new HttpClient
+                {
+                    Timeout = TimeSpan.FromSeconds(120)
+                };
             }
 
             List<double> latencies = new List<double>();
