@@ -16,22 +16,26 @@ namespace HttpReq
         static List<double> _latencies = new List<double>();
         static TimeSpan _totalTime = new TimeSpan();
         static int _totalRequests = 0;
+        static HttpClient[] _clients;
+
 
         static void Main(string[] args)
         {
-            if (args.Length != 4)
+            if (args.Length < 4 || args.Length > 5)
             {
-                Console.WriteLine("Usage: dotnet HttpReq.dll {url} {iterations} {reqPerIteration} {SleepBetweenIterationsInMS}");
+                Console.WriteLine("Usage: dotnet HttpReq.dll {client | timer} {url} {iterations} {reqPerIteration} [{SleepBetweenIterationsInMS}]");
                 return;
             }
 
             DateTimeOffset start = DateTimeOffset.UtcNow;
-            string url = args[0];
-            int maxIterations = Int32.Parse(args[1]);
-            int countPerIteration = Int32.Parse(args[2]);
-            int delay = Int32.Parse(args[3]);
+            int i = 0;
+            bool clientMode = String.Equals(args[i++], "client", StringComparison.OrdinalIgnoreCase);
+            string url = args[i++];
+            int maxIterations = Int32.Parse(args[i++]);
+            int countPerIteration = Int32.Parse(args[i++]);
+            int delay = args.Length == 5 ? Int32.Parse(args[i++]) : 0;
 
-            SendRequestsAsync(url, maxIterations, countPerIteration, delay).Wait();
+            SendRequestsAsync(url, maxIterations, countPerIteration, delay, clientMode).Wait();
 
             Console.WriteLine();
             Console.WriteLine($"Test input:");
@@ -64,39 +68,69 @@ namespace HttpReq
             }
         }
 
-        static async Task SendRequestsAsync(string url, int maxIterations, int countPerIteration, int delay)
+        static async Task SendRequestsAsync(string url, int maxIterations, int countPerIteration, int delay, bool clientMode)
         {
-            var tasks = new List<Task>();
-
             // Generate a bunch of clients to avoid getting requests affinitized to a FrontEnd
-            var clients = new HttpClient[50];
-            for (int i = 0; i < clients.Length; i++)
+            _clients = new HttpClient[50];
+            for (int i = 0; i < _clients.Length; i++)
             {
-                clients[i] = new HttpClient
+                _clients[i] = new HttpClient
                 {
                     Timeout = TimeSpan.FromSeconds(120)
                 };
             }
 
-            List<double> latencies = new List<double>();
-            for (int currentIteration = 0; currentIteration < maxIterations; currentIteration++)
+            var tasks = new List<Task>();
+
+            if (clientMode)
             {
+                // Client mode: a bunch of clients each send requests one after another
                 for (int index = 0; index < countPerIteration; index++)
                 {
-                    HttpClient client = clients[(new Random()).Next() % clients.Length];
-                    tasks.Add(client.GetAsync(url).ContinueWith(RequestDone, new InvocationState { Start = DateTimeOffset.UtcNow, Iteration = currentIteration, Index = index }));
+                    tasks.Add(SendRequestsAsyncOneClient(url, maxIterations, delay, index));
                 }
+            }
+            else
+            {
+                // Timer mode, we send 'countPerIteration' requests every 'delay', regardless of how long they take
+                for (int currentIteration = 0; currentIteration < maxIterations; currentIteration++)
+                {
+                    for (int index = 0; index < countPerIteration; index++)
+                    {
+                        tasks.Add(
+                            GetHttpClient().GetAsync(url).ContinueWith(
+                                RequestDone, new InvocationState { Start = DateTimeOffset.UtcNow, Iteration = currentIteration, Index = index }));
+                    }
 
-                await Task.Delay(delay);
+                    await Task.Delay(delay);
+                }
             }
 
             await Task.WhenAll(tasks);
         }
 
+        static async Task SendRequestsAsyncOneClient(string url, int maxIterations, int delay, int clientIndex)
+        {
+            for (int currentIteration = 0; currentIteration < maxIterations; currentIteration++)
+            {
+                var invocationState = new InvocationState { Start = DateTimeOffset.UtcNow, Iteration = currentIteration, Index = clientIndex };
+                RequestDone(
+                    GetHttpClient().GetAsync(url),
+                    invocationState
+                );
+
+                await Task.Delay(delay);
+            }
+        }
+
+        static HttpClient GetHttpClient()
+        {
+            return _clients[(new Random()).Next() % _clients.Length];
+        }
+
         static void RequestDone(Task<HttpResponseMessage> action, object state)
         {
             var invocationState = (InvocationState)state;
-            TimeSpan elapsed = DateTimeOffset.UtcNow - invocationState.Start;
 
             HttpResponseMessage response = null;
             int statusCode;
@@ -111,6 +145,8 @@ namespace HttpReq
                 // Probably a timeout
                 statusCode = 0;
             }
+
+            TimeSpan elapsed = DateTimeOffset.UtcNow - invocationState.Start;
 
             lock (_lock)
             {
