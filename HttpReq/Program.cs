@@ -37,6 +37,8 @@ namespace HttpReq
 
             SendRequestsAsync(url, maxIterations, countPerIteration, delay, clientMode).Wait();
 
+            var totalTestTime = DateTimeOffset.UtcNow - start;
+
             Console.WriteLine();
             Console.WriteLine($"Test input:");
             Console.WriteLine($"  UTC time: {start.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'fff'Z'")}");
@@ -46,7 +48,9 @@ namespace HttpReq
             Console.WriteLine($"  Delay between iterations: {delay}");
 
             Console.WriteLine();
-            Console.WriteLine($"Total test time: {(int)(DateTimeOffset.UtcNow - start).TotalMilliseconds}ms");
+            Console.WriteLine($"Total test time: {(int)totalTestTime.TotalMilliseconds}ms");
+            Console.WriteLine($"Total requests: {countPerIteration * maxIterations}");
+            Console.WriteLine($"Throughput: {((countPerIteration * maxIterations) / totalTestTime.TotalSeconds).ToString("#.##")} rps");
             Console.WriteLine($"Min latency: {(int)_latencies.Min()}ms");
             Console.WriteLine($"Avg. latency: {(int)_latencies.Average()}ms");
             Console.WriteLine($"Max latency: {(int)_latencies.Max()}ms");
@@ -61,7 +65,7 @@ namespace HttpReq
             }
 
             Console.WriteLine();
-            Console.WriteLine("Request count by server");
+            Console.WriteLine($"Request count by server ({_servers.Count} servers)");
             foreach (var pair in _servers)
             {
                 Console.WriteLine($"  {pair.Key}: {pair.Value}");
@@ -114,7 +118,7 @@ namespace HttpReq
             for (int currentIteration = 0; currentIteration < maxIterations; currentIteration++)
             {
                 var invocationState = new InvocationState { Start = DateTimeOffset.UtcNow, Iteration = currentIteration, Index = clientIndex };
-                RequestDone(
+                await RequestDone(
                     GetHttpClient().GetAsync(url),
                     invocationState
                 );
@@ -128,7 +132,7 @@ namespace HttpReq
             return _clients[(new Random()).Next() % _clients.Length];
         }
 
-        static void RequestDone(Task<HttpResponseMessage> action, object state)
+        static async Task RequestDone(Task<HttpResponseMessage> action, object state)
         {
             var invocationState = (InvocationState)state;
 
@@ -137,7 +141,7 @@ namespace HttpReq
 
             try
             {
-                response = action.Result;
+                response = await action;
                 statusCode = (int)response.StatusCode;
             }
             catch (Exception)
