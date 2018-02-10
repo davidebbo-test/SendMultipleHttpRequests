@@ -66,7 +66,7 @@ namespace HttpReq
 
             Console.WriteLine();
             Console.WriteLine($"Request count by server ({_servers.Count} servers)");
-            foreach (var pair in _servers)
+            foreach (var pair in _servers.OrderBy(s => s.Key))
             {
                 Console.WriteLine($"  {pair.Key}: {pair.Value}");
             }
