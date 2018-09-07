@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -82,6 +83,8 @@ namespace HttpReq
                 {
                     Timeout = TimeSpan.FromSeconds(120)
                 };
+
+                _clients[i].DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
             }
 
             var tasks = new List<Task>();
